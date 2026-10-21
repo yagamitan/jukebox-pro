@@ -1,17 +1,19 @@
 import express from "express";
-const router = express.Router();
-export default router;
-
+import requireUser from "#middleware/requireUser";
 import {
   createPlaylist,
   getPlaylistById,
-  getPlaylists,
+  getPlaylistsByOwnerId,
 } from "#db/queries/playlists";
 import { createPlaylistTrack } from "#db/queries/playlists_tracks";
 import { getTracksByPlaylistId } from "#db/queries/tracks";
 
+const router = express.Router();
+router.use(requireUser);
+export default router;
+
 router.get("/", async (req, res) => {
-  const playlists = await getPlaylists();
+  const playlists = await getPlaylistsByOwnerId(req.user.id);
   res.send(playlists);
 });
 
@@ -22,7 +24,7 @@ router.post("/", async (req, res) => {
   if (!name || !description)
     return res.status(400).send("Request body requires: name, description");
 
-  const playlist = await createPlaylist(name, description);
+  const playlist = await createPlaylist(name, description, req.user.id);
   res.status(201).send(playlist);
 });
 
@@ -30,12 +32,24 @@ router.param("id", async (req, res, next, id) => {
   const playlist = await getPlaylistById(id);
   if (!playlist) return res.status(404).send("Playlist not found.");
 
+  if (playlist.user_id !== req.user.id) {
+    return res.status(403).send("Forbidden.");
+  }
   req.playlist = playlist;
   next();
 });
 
-router.get("/:id", (req, res) => {
-  res.send(req.playlist);
+router.get("/:id", async (req, res, next) => {
+  try {
+    const tracks = await getTracksByPlaylistId(req.playlist.id);
+
+    res.send({
+      ...req.playlist,
+      tracks,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get("/:id/tracks", async (req, res) => {

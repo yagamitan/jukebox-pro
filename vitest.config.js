@@ -1,8 +1,13 @@
 import { loadEnvFile } from "node:process";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig(() => ({
+loadEnvFile();
+
+export default defineConfig({
   test: {
-    env: loadEnvFile(),
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL,
+      JWT_SECRET: process.env.JWT_SECRET,
+    },
   },
-}));
+});
